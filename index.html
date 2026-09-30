@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jak jsem se dostal až k videu – AI first přístup | OŽP LAB</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='5' width='20' height='24' rx='6' fill='%231f5c66'/%3E%3Cpath d='M8 24 L24 10' stroke='%23fff' stroke-width='3.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Semi+Condensed:wght@600;700;800&family=Kalam&display=swap&subset=latin-ext" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1b2a3a; --soft: #52616c; --paper: #f1f4f0; --line: #cbd6d2;
+    --petrol: #1f5c66; --green: #3f6b3f; --ochre: #c48a2c; --ochre-soft: #f3e3c2;
+    --hill1: #d7e5d8; --hill2: #bfd5c1;
+    --ui: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+    --text: "Barlow", "Segoe UI", system-ui, sans-serif;
+    --hand: "Kalam", "Segoe Print", cursive;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--text); font-size: 17px; line-height: 1.6; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 44px); }
+  :focus-visible { outline: 3px solid var(--ochre); outline-offset: 2px; }
+
+  header { padding: clamp(32px, 6vw, 72px) 0 8px; display: flex; flex-wrap: wrap; gap: 16px 40px; align-items: end; justify-content: space-between; }
+  .kicker { font-family: var(--ui); font-weight: 700; font-size: 18px; color: var(--petrol); margin: 0 0 8px; }
+  h1 { font-family: var(--ui); font-weight: 800; font-size: clamp(38px, 6vw, 72px); line-height: .98; margin: 0; letter-spacing: -.01em; max-width: 14ch; }
+  .subtitle { font-family: var(--hand); font-size: clamp(22px, 2.6vw, 30px); color: var(--ochre); margin: 6px 0 0; transform: rotate(-1.5deg); transform-origin: left; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; font-family: var(--ui); font-size: 16px; color: var(--soft); }
+  .legend li { display: flex; align-items: center; gap: 8px; }
+  .legend i { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--c); background: #fff; }
+  .legend .dead i { border: 0; background: none; font-style: normal; color: #8a969c; width: auto; height: auto; font-weight: 700; }
+
+  /* Mapa */
+  .map { position: relative; margin-top: 12px; }
+  .map > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .map > svg.top { pointer-events: none; z-index: 2; }
+  .hill-a { fill: var(--hill1); } .hill-b { fill: var(--hill2); }
+  .plan { fill: none; stroke: #9fb0a8; stroke-width: 3; stroke-dasharray: 1 10; stroke-linecap: round; }
+  .done { fill: none; stroke: var(--ochre); stroke-width: 5; stroke-linecap: round; }
+  .dead { opacity: 0; transition: opacity .5s; }
+  .dead.on { opacity: 1; }
+  .dead path { fill: none; stroke: #8a969c; stroke-width: 2.5; stroke-dasharray: 5 6; }
+  .dead text { font-family: var(--hand); font-size: 15px; fill: #6d7a80; }
+  .dead .x { stroke: #8a969c; stroke-width: 3; stroke-linecap: round; }
+
+  .stops { list-style: none; margin: 0; padding: 0; }
+  .stop { position: absolute; width: var(--w); transform: translateX(-50%); text-align: center; z-index: 1; }
+  .stop button {
+    all: unset; cursor: pointer; display: block; width: 100%; text-align: inherit; border-radius: 8px;
+  }
+  .stop button:focus-visible { outline: 3px solid var(--ochre); outline-offset: 4px; }
+  .dot {
+    display: grid; place-items: center; margin: 0 auto;
+    width: 42px; height: 42px; border-radius: 50%; background: #fff;
+    border: 4px solid #b7c3c7; color: #9aa7ad; font-family: var(--ui); font-weight: 800; font-size: 18px;
+    transform: translateY(-50%) scale(.85); margin-bottom: -10px;
+    transition: transform .35s cubic-bezier(.3,1.6,.5,1), border-color .3s, color .3s, background .3s, box-shadow .3s;
+  }
+  .stop .lbl { display: block; font-family: var(--ui); font-weight: 700; font-size: 19px; line-height: 1.15; opacity: .4; transition: opacity .4s; }
+  .stop.reached .dot { border-color: var(--c); color: var(--c); transform: translateY(-50%) scale(1); }
+  .stop.reached .lbl { opacity: 1; }
+  .stop.active .dot { background: var(--c); color: #fff; box-shadow: 0 0 0 7px rgba(196,138,44,.35); }
+  .stop button:hover .lbl { color: var(--petrol); }
+
+  .one .stop { transform: none; text-align: left; padding-left: 58px; }
+  .one .stop .dot { position: absolute; left: 0; top: 0; margin: 0; transform: translateY(-4px) scale(.85); }
+  .one .stop.reached .dot { transform: translateY(-4px) scale(1); }
+  .one .stop .lbl { padding-top: 6px; }
+
+  /* Panel s textem */
+  .panel {
+    position: sticky; bottom: 12px; z-index: 5; margin: 18px 0 0;
+    background: #fff; border-radius: 12px; padding: 18px 22px 16px;
+    border-left: 7px solid var(--c, var(--petrol));
+    box-shadow: 0 10px 30px rgba(27,42,58,.14);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 28px; align-items: end;
+  }
+  .panel-step { font-family: var(--ui); font-weight: 600; font-size: 15px; color: var(--soft); margin: 0; }
+  .panel h2 { font-family: var(--ui); font-weight: 700; font-size: 26px; line-height: 1.1; margin: 2px 0 6px; }
+  .panel p.txt { margin: 0; max-width: 70ch; min-height: 3.2em; }
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; }
+  .controls button {
+    font-family: var(--ui); font-weight: 600; font-size: 16px; cursor: pointer;
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    padding: 6px 14px; border-radius: 999px;
+  }
+  .controls button:hover { border-color: var(--petrol); }
+  .controls .main { background: var(--ink); color: #fff; border-color: var(--ink); min-width: 104px; }
+  .controls button:disabled { opacity: .35; cursor: default; }
+  @media (max-width: 720px) {
+    .panel { grid-template-columns: 1fr; padding: 14px 16px; }
+    .panel h2 { font-size: 22px; }
+    .panel p.txt { font-size: 15.5px; min-height: 0; }
+  }
+
+  /* Celý text */
+  article { max-width: 68ch; margin: clamp(56px, 8vw, 96px) auto 0; }
+  article h2 { font-family: var(--ui); font-weight: 700; font-size: 30px; line-height: 1.1; margin: 40px 0 10px; }
+  article h2:first-child { font-size: clamp(32px, 4vw, 44px); margin-top: 0; }
+  article p { margin: 0 0 14px; }
+  article .lesson { font-family: var(--hand); font-size: 22px; line-height: 1.4; color: var(--petrol); border-left: 4px solid var(--ochre); padding-left: 18px; margin: 24px 0; }
+
+  /* Odkazy na výsledky */
+  .jump { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .jump a {
+    font-family: var(--ui); font-weight: 700; font-size: 17px; text-decoration: none;
+    color: #5b4220; background: var(--ochre-soft); border: 1px solid var(--ochre);
+    padding: 5px 16px; border-radius: 999px;
+  }
+  .jump a:hover { background: var(--ochre); color: #fff; }
+  .stop .badge { display: block; font-family: var(--hand); font-size: 15px; color: #8a5a12; margin-top: 1px; opacity: .4; transition: opacity .4s; }
+  .stop.reached .badge { opacity: 1; }
+  .p-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .p-links:empty { display: none; }
+  .p-links button {
+    font-family: var(--ui); font-weight: 700; font-size: 16px; cursor: pointer;
+    background: var(--ochre-soft); border: 1px solid var(--ochre); color: #5b4220;
+    padding: 5px 14px; border-radius: 999px;
+  }
+  .p-links button:hover { background: var(--ochre); color: #fff; }
+
+  .results { margin-top: clamp(56px, 8vw, 96px); scroll-margin-top: 16px; }
+  .results > h2 { font-family: var(--ui); font-weight: 700; font-size: clamp(32px, 4vw, 44px); margin: 0 0 20px; }
+  .res-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 900px) { .res-grid { grid-template-columns: 1fr; } }
+  .res { background: #fff; border-radius: 12px; padding: 20px 22px 22px; border-top: 7px solid var(--c); scroll-margin-top: 16px; }
+  .res h3 { font-family: var(--ui); font-weight: 700; font-size: 26px; margin: 0 0 2px; }
+  .res p { margin: 0 0 14px; color: var(--soft); font-size: 16px; }
+  .thumbs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .thumbs button { all: unset; cursor: zoom-in; display: block; width: 100%; border-radius: 8px; }
+  .thumbs button:focus-visible { outline: 3px solid var(--ochre); outline-offset: 3px; }
+  .thumbs .img { aspect-ratio: 4 / 5; background: var(--paper); border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+  .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform .3s; }
+  .thumbs button:hover img { transform: scale(1.03); }
+  .thumbs .cap { display: block; font-family: var(--ui); font-weight: 700; font-size: 17px; line-height: 1.2; margin-top: 6px; }
+  .thumbs .sub { display: block; font-size: 14px; color: var(--soft); }
+  .missing { display: grid; place-items: center; height: 100%; padding: 12px; text-align: center; font-size: 13px; color: var(--soft); overflow-wrap: anywhere; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; margin-bottom: 12px; }
+  .seg button { font-family: var(--ui); font-weight: 600; font-size: 15px; border: 0; background: none; padding: 4px 14px; border-radius: 999px; cursor: pointer; color: var(--soft); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .vstage { background: var(--ink); border-radius: 8px; overflow: hidden; display: grid; place-items: center; min-height: 240px; }
+  .vstage video { display: block; width: 100%; max-height: 72vh; background: var(--ink); }
+  .vstage.vertical { background: var(--ink); }
+  .vstage.vertical video { width: auto; max-width: 100%; height: min(72vh, 760px); }
+  .seg[hidden] { display: none; }
+  .vstage .missing { color: #d9e3e6; min-height: 240px; }
+  .vstage code, .missing code { font-size: 13px; }
+
+  /* Prohlížeč komiksu */
+  .viewer { width: 100vw; height: 100vh; max-width: 100vw; max-height: 100vh; margin: 0; padding: 0; border: 0; background: #121c26; color: #fff; }
+  .viewer::backdrop { background: rgba(18,28,38,.8); }
+  .v-top { position: sticky; top: 0; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 12px 18px; background: #121c26; z-index: 1; }
+  .v-title { font-family: var(--ui); font-weight: 700; font-size: 20px; margin-right: auto; }
+  .v-top button, .v-top a {
+    font-family: var(--ui); font-weight: 600; font-size: 16px; color: #fff; text-decoration: none; cursor: pointer;
+    background: transparent; border: 1px solid rgba(255,255,255,.3); padding: 5px 14px; border-radius: 999px;
+  }
+  .v-top button:hover, .v-top a:hover { border-color: #fff; }
+  .v-top button:disabled { opacity: .3; cursor: default; }
+  .v-body { height: calc(100vh - 62px); overflow: auto; display: grid; place-items: center; padding: 0 12px 12px; }
+  .v-body img { max-width: 100%; max-height: calc(100vh - 80px); cursor: zoom-in; display: block; }
+  .v-body.zoom { place-items: start center; }
+  .v-body.zoom img { max-width: none; max-height: none; cursor: zoom-out; }
+  .v-body .missing { color: #c3d0d6; font-size: 16px; }
+
+  footer { padding: 48px 0; }
+  .disclaimer { max-width: 68ch; margin: 18px auto 0; text-align: center; font-size: 14px; line-height: 1.5; color: var(--soft); }
+  .slogan { font-family: var(--hand); font-size: clamp(24px, 3vw, 32px); color: var(--petrol); margin: 0; text-align: center; }
+
+  @media (prefers-reduced-motion: reduce) { .dot, .stop .lbl, .dead { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <p class="kicker">OŽP LAB</p>
+      <h1>Jak jsem se dostal až k videu</h1>
+      <p class="subtitle">AI first přístup</p>
+    </div>
+    <div style="display:grid; gap:14px; justify-items:end">
+    <ul class="jump" aria-label="Výsledky">
+      <li><a href="#vysledek-komiks">Komiks</a></li>
+      <li><a href="#vysledek-video">Video</a></li>
+    </ul>
+    <ul class="legend" aria-label="Legenda">
+      <li style="--c: var(--petrol)"><i></i>Komiks</li>
+      <li style="--c: var(--green)"><i></i>Video</li>
+      <li class="dead"><i>×</i>Slepé cesty</li>
+    </ul>
+    </div>
+  </header>
+
+  <div class="map" id="map">
+    <svg id="base" aria-hidden="true"></svg>
+    <ol class="stops" id="stops" aria-label="Milníky"></ol>
+    <svg id="top" class="top" aria-hidden="true"></svg>
+  </div>
+
+  <section class="panel" id="panel" aria-label="Aktuální milník">
+    <div>
+      <p class="panel-step" id="p-step"></p>
+      <h2 id="p-title"></h2>
+      <p class="txt" id="p-text" aria-live="polite"></p>
+      <div class="p-links" id="p-links"></div>
+    </div>
+    <div class="controls">
+      <button type="button" id="b-prev" aria-label="Předchozí milník">‹</button>
+      <button type="button" id="b-play" class="main">Pozastavit</button>
+      <button type="button" id="b-next" aria-label="Další milník">›</button>
+      <button type="button" id="b-restart">Od začátku</button>
+    </div>
+  </section>
+
+  <section class="results" id="vysledky" aria-labelledby="vys-h">
+    <h2 id="vys-h">Výsledky</h2>
+    <div class="res-grid">
+      <div class="res" id="vysledek-komiks" style="--c: var(--petrol)">
+        <h3>Komiks</h3>
+        <p>Devítistránkový komiks o práci, kterou běžně nevidíme, a list postav a prostředí, ze kterého vychází i video. Kliknutím obrázek zvětšíte.</p>
+        <ul class="thumbs" id="thumbs"></ul>
+      </div>
+      <div class="res" id="vysledek-video" style="--c: var(--green)">
+        <h3>Video: ochrana ovzduší</h3>
+        <p id="v-desc"></p>
+        <div class="seg" role="group" aria-label="Formát videa" id="v-seg"></div>
+        <div class="vstage" id="vstage"></div>
+      </div>
+    </div>
+  </section>
+
+  <article>
+    <h2>Celý příběh</h2>
+    <p>Na začátku nestála technologie, ale otázka: jak ukázat, co dělají kolegové na Odboru životního prostředí a zemědělství? Nešlo mi o výčet agend. Chtěl jsem ukázat dopad jejich práce na život ve Středočeském kraji. Životní prostředí se totiž dotýká všech, i když si to většina z nás běžně neuvědomuje. První představa byla jasná: komiks, nebo animace. Něco, co člověk pochopí bez úředního slovníku.</p>
+
+    <h2>Od webu k Markdownu</h2>
+    <p>Začal jsem u toho, co už existovalo. Z veřejného webu jsem stáhl materiály, které práci jednotlivých oddělení popisují, a převedl je do Markdownu. Vzniklo deset souborů o vodě, ovzduší, odpadech, přírodě, lesích, zemědělství, posuzování záměrů i environmentální výchově. Tahle zdrojová vrstva zůstala po celou dobu nedotčená. Všechno další z ní vycházelo, ale nic ji nepřepisovalo.</p>
+
+    <h2>Pracovní dokumenty místo rovnou komiksu</h2>
+    <p>Nenechal jsem si rovnou „nakreslit komiks“. Nejdřív vznikla řada pracovních dokumentů. Inventura zdrojů našla 17 jedinečných oblastí práce. Občanský překlad z nich udělal 17 karet a 8 témat blízkých lidem, třeba „Co se děje za popelnicí?“ nebo „Když najdeme zraněné zvíře“. Následovalo devět možných forem vyprávění a porovnání tří hlavních sdělení. Nakonec jsem zvolil tezi „OŽP v mém životě“.</p>
+    <p>Od začátku platila jedna podmínka: komiks nesmí popisovat agendy a administrativní postupy. Žádná razítka, formuláře ani úředníci za stolem. Místo toho pracovní rámec „díky práci kolegů z OŽP jsou vytvářeny podmínky pro…“. Ukázat přínos, ale nepřisvojovat si práci obcí, záchranných stanic, škol nebo provozovatelů.</p>
+
+    <h2>Jana a její svět</h2>
+    <p>Pak přišla vizuální část. Vygeneroval jsem character &amp; world sheet, jeden list s hlavní postavou Janou, modelovými kolegy z odboru, typickými místy kraje a barevnou paletou. Jana je obyvatelka kraje kolem čtyřicítky v okrové bundě a s petrolejovým batohem s bílým pruhem. Není to úřednice, je to někdo, kdo si postupně všímá souvislostí.</p>
+    <p>A pak už jsem „jen“ ladil komiks. V uvozovkách proto, že slepých cest bylo hodně. Vznikly tři různé varianty, jejich revize a spousta obrázků s překlepy, zkomolenými logy nebo tvrzeními, která by neobstála před odborníkem. Postupně se ukazovaly i drobné rozpory: jednou měla Jana krátké vlasy, jindy dlouhé, a kolegové měli v různých dokumentech různá jména.</p>
+
+    <h2>Impuls k videu</h2>
+    <p>Když byl komiks hotový, přišla výzva od Filipa Dřímalky, nebo spíš informace o tom, jak se dá s AI tvořit video. Měl jsem v tu chvíli obrovskou kopu materiálů: podklady, postavy, prostředí, hotové kresby. Tak jsem začal tvořit.</p>
+    <p>Ani tady to nešlo napoprvé. První pokus s obecným zadáním „vytvoř video“ nedal použitelný výsledek. Chtít rovnou vytvořit animaci z celého Fidelity komiksu bylo trochu troufalé a velké sousto. Musel jsem se vrátit k jednotlivostem: vybrat jedno téma, ochranu ovzduší, nechat video vyrůst z už ustáleného vizuálního světa a generovat i samostatné assety, tedy jednotlivé kresby postavy, prostředí a klíčových záběrů. Dnes bych volil jednodušší začátek, ale byla to dobrá škola.</p>
+    <p>První verze byla plochý explainer, který na dvacet sekund utíkal příliš rychle. Druhá přenesla příběh do komiksového světa. Další verze pracovaly se skutečnou kresbou ze sheetu. Po cestě se objevovaly chyby, které člověk zachytí jen při kontrole snímek po snímku, třeba prolínání výrazů, při kterém měla Jana na pár snímků dvě tváře přes sebe. Reálná loga jsem pak ve videu i v komiksu zakryl, abych nevytvořil dojem, že jde o oficiální výstup.</p>
+
+    <h2>Výsledek</h2>
+    <p>Dnes je tu krátké video o 28,7 sekundách a pěti scénách. Jana ráno vyjde ven a ví, jaký vzduch dýchá. Když se kvalita zhorší, dozví se to včas. A dopad nového provozu na vzduch se řeší předem. Hrdinou je občanka, ne úřad.</p>
+    <p class="lesson">Větší prompt automaticky neudělá lepší výsledek. Lépe fungovaly malé, konkrétní kroky nad jasně definovaným základem a pokaždé kontrola toho, co skutečně vzniklo.</p>
+    <p>Slepých cest bylo dost, ale myslím, že se nakonec podařilo uhrát dobrý výsledek.</p>
+  </article>
+
+  <footer>
+    <p class="slogan">Stejný kraj. Více souvislostí.</p>
+    <p class="disclaimer">OŽP LAB je nezávislý osobní tvůrčí experiment inspirovaný prací kolegů z Odboru životního prostředí a zemědělství Středočeského kraje. Projekt ukazuje možnosti přístupu AI FIRST při práci s veřejně dostupnými informacemi. Nejde o oficiální prezentaci ani stanovisko Středočeského kraje.</p>
+  </footer>
+</div>
+
+<dialog class="viewer" id="viewer" aria-labelledby="v-title">
+  <div class="v-top">
+    <span class="v-title" id="v-title"></span>
+    <button type="button" id="v-prev">Předchozí</button>
+    <button type="button" id="v-next">Další</button>
+    <button type="button" id="v-zoom">Skutečná velikost</button>
+    <a id="v-raw" target="_blank" rel="noopener">Otevřít originál</a>
+    <button type="button" id="v-close">Zavřít</button>
+  </div>
+  <div class="v-body" id="v-body"><img id="v-img" alt=""></div>
+</dialog>
+
+<script>
+(() => {
+/* ------------------------------------------------------------
+   VÝSLEDKY – cesty k souborům (relativní k index.html).
+   Soubory zkopírujte do složek vysledky/komiks a vysledky/video.
+   ------------------------------------------------------------ */
+const RESULTS = {
+  comics: [
+    { title: "Komiks", sub: "Za tím, co vidíme, je i práce, kterou běžně nevidíme (9 stran)", file: "vysledky/komiks/FIDELITY_REV_V1_A_public_logo_cover.png", thumb: "vysledky/nahledy/komiks_nahled.jpg" },
+    { title: "Character & World Sheet", sub: "Postavy, prostředí a paleta", file: "vysledky/komiks/FIDELITY_CHARACTER_WORLD_SHEET_public_logo_cover.png", thumb: "vysledky/nahledy/sheet_nahled.jpg" }
+  ],
+  video: {
+    desc: "Fidelity v3 RC2, 28,7 sekundy, pět scén. Formát na výšku pro mobil a sociální sítě.",
+    formats: [
+      { label: "9:16", file: "vysledky/video/ozp_air_quality_fidelity_v3_rc2_9x16_public_logo_cover.mp4", poster: "vysledky/nahledy/video_poster.jpg", vertical: true }
+    ]
+  }
+};
+
+/* Milníky – upravujte zde. track: "komiks" | "video". dead: u milníku odbočuje slepá cesta. */
+const STEPS = [
+  { track: "komiks", title: "Myšlenka", text: "Zpopularizovat práci kolegů z Odboru životního prostředí a zemědělství a ukázat její dopad na život ve Středočeském kraji. Životní prostředí se dotýká všech. Forma: komiks, nebo animace." },
+  { track: "komiks", title: "Podklady z webu", text: "Z veřejného webu jsem stáhl materiály popisující práci jednotlivých oddělení a převedl je do Markdownu. Vzniklo deset zdrojových souborů, které se už nepřepisovaly." },
+  { track: "komiks", title: "Pracovní dokumenty", text: "Nejdřív inventura (17 oblastí práce), pak 17 občanských karet, 8 témat blízkých lidem a devět forem vyprávění. Podmínka: žádné agendy ani administrativní postupy." },
+  { track: "komiks", title: "Hlavní sdělení", text: "Ze tří porovnaných tezí jsem zvolil „OŽP v mém životě“. Rámec: díky práci kolegů jsou vytvářeny podmínky pro… Přínos ukázat, cizí práci si nepřisvojovat." },
+  { track: "komiks", title: "Character & World Sheet", text: "Jeden list s Janou, modelovými kolegy, místy kraje a paletou. Jana je obyvatelka kraje v okrové bundě s petrolejovým batohem. Není to úřednice.", links: [{ label: "Zobrazit sheet", act: "comic:1" }] },
+  { track: "komiks", title: "Ladění komiksu", text: "Tři varianty, revize a spousta generovaných obrázků s překlepy a zkomolenými logy. Jana měla jednou krátké, jindy dlouhé vlasy. Slepých cest bylo hodně.", dead: true, badge: "výsledek: komiks", links: [{ label: "Zobrazit komiks", act: "comic:0" }] },
+  { track: "video", title: "Impuls k videu", text: "Když byl komiks hotový, přišla výzva od Filipa Dřímalky, nebo spíš informace o tvorbě videa přes AI. A materiálů jsem měl kopu." },
+  { track: "video", title: "Krok zpět", text: "Obecné zadání „vytvoř video“ nedalo použitelný výsledek. Chtít rovnou animovat celý Fidelity komiks bylo trochu troufalé a velké sousto. Vrátil jsem se k jednotlivostem: jedno téma, ochrana ovzduší, a samostatně generované assety. Dnes bych volil jednodušší začátek, ale byla to dobrá škola.", dead: true },
+  { track: "video", title: "Verze a kontrola", text: "Plochý explainer, komiksový svět, skutečná kresba ze sheetu. Kontrola snímek po snímku odhalila i Janu se dvěma tvářemi přes sebe. Reálná loga jsem pak zakryl, abych nevytvořil dojem, že jde o oficiální výstup.", dead: true },
+  { track: "video", title: "Video", text: "28,7 sekundy, pět scén. Jana ví, jaký vzduch dýchá, a když se zhorší, dozví se to včas. Hrdinou je občanka, ne úřad.", badge: "výsledek: video", links: [{ label: "Přehrát video", act: "video" }] }
+];
+
+const COLOR = { komiks: "#1f5c66", video: "#3f6b3f" };
+const SPEED = 320;      // px za sekundu
+const PAUSE = 3200;     // ms zastavení u milníku
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const map = document.getElementById("map");
+const base = document.getElementById("base");
+const topSvg = document.getElementById("top");
+const stopsEl = document.getElementById("stops");
+const bPlay = document.getElementById("b-play");
+
+let W = 0, one = false, done = null, total = 0, lens = [], stopEls = [], deadEls = {}, pin = null;
+let prog = 0, active = -1, playing = false, waitUntil = 0, last = 0, started = false;
+
+function smooth(p) {
+  let d = `M${p[0].x},${p[0].y}`;
+  for (let i = 0; i < p.length - 1; i++) {
+    const a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
+    d += ` C${(b.x + (c.x - a.x) / 6).toFixed(1)},${(b.y + (c.y - a.y) / 6).toFixed(1)} ${(c.x - (e.x - b.x) / 6).toFixed(1)},${(c.y - (e.y - b.y) / 6).toFixed(1)} ${c.x},${c.y}`;
+  }
+  return d;
+}
+
+function layout() {
+  W = map.clientWidth;
+  const cols = W >= 1050 ? 5 : W >= 640 ? 3 : 1;
+  one = cols === 1;
+  map.classList.toggle("one", one);
+  const rowH = one ? 104 : 230, topY = one ? 36 : 110;
+  const margin = one ? 21 : Math.min(120, W / cols / 2);
+  const rows = Math.ceil(STEPS.length / cols);
+  const H = topY + (rows - 1) * rowH + (one ? 80 : 150);
+  map.style.height = H + "px";
+
+  const pts = STEPS.map((s, i) => {
+    const r = Math.floor(i / cols), c = i % cols, cc = r % 2 ? cols - 1 - c : c;
+    const x = one ? margin : margin + cc * (W - 2 * margin) / (cols - 1);
+    return { x, y: topY + r * rowH + (one ? 0 : (cc % 2 ? -16 : 16)), r, cc };
+  });
+  const route = [{ x: one ? margin : -10, y: one ? 0 : pts[0].y + 16 }];
+  pts.forEach((p, i) => {
+    route.push(p);
+    const n = pts[i + 1];
+    if (!one && n && n.r !== p.r) route.push({ x: p.x > W / 2 ? W - 10 : 10, y: (p.y + n.y) / 2 });
+  });
+  const lp = pts[pts.length - 1];
+  const end = one ? { x: margin, y: lp.y + 60 } : { x: lp.x + (lp.r % 2 ? -70 : 70), y: lp.y + 30 };
+  route.push(end);
+  const d = smooth(route);
+
+  let hills = "";
+  if (!one) {
+    for (let r = 0; r < rows; r++) {
+      const y = topY + r * rowH + 50;
+      hills += `<path class="hill-a" opacity=".55" d="M0,${y + 40} C${W * .2},${y} ${W * .35},${y + 50} ${W * .55},${y + 22} S${W * .85},${y + 6} ${W},${y + 30} L${W},${y + 160} L0,${y + 160}Z"/>`;
+    }
+    hills += `<path class="hill-b" d="M0,${H - 30} C${W * .25},${H - 60} ${W * .5},${H - 22} ${W * .75},${H - 46} S${W},${H - 38} ${W},${H - 40} L${W},${H} L0,${H}Z"/>`;
+  }
+
+  // Slepé cesty: krátká čárkovaná odbočka nahoru, zakončená křížkem
+  let dead = "";
+  if (!one) {
+    STEPS.forEach((s, i) => {
+      if (!s.dead) return;
+      const p = pts[i], dir = p.cc === 0 ? 1 : -1;
+      const ex = p.x + dir * 52, ey = p.y - 66;
+      dead += `<g class="dead" data-i="${i}">
+        <path d="M${p.x},${p.y - 20} Q${p.x + dir * 6},${p.y - 52} ${ex},${ey}"/>
+        <line class="x" x1="${ex - 6}" y1="${ey - 6}" x2="${ex + 6}" y2="${ey + 6}"/><line class="x" x1="${ex + 6}" y1="${ey - 6}" x2="${ex - 6}" y2="${ey + 6}"/>
+        <text x="${ex + dir * 12}" y="${ey + 5}" text-anchor="${dir > 0 ? "start" : "end"}">slepá cesta</text></g>`;
+    });
+  }
+
+  const sign = one ? "" : `<g transform="translate(${end.x},${end.y})">
+    <line y1="8" y2="-68" stroke="#7b5a2e" stroke-width="4" stroke-linecap="round"/>
+    ${["PŘÍRODA", "LIDÉ", "MOŽNOSTI"].map((t, i) => {
+      const w = t.length * 8 + 14, dir = i % 2 ? -1 : 1, x = dir > 0 ? 0 : -w, y = -64 + i * 21;
+      const tip = dir > 0 ? `${w},${y} ${w + 8},${y + 8} ${w},${y + 16}` : `${-w},${y} ${-w - 8},${y + 8} ${-w},${y + 16}`;
+      return `<rect x="${x}" y="${y}" width="${w}" height="16" fill="#f3e3c2" stroke="#7b5a2e" stroke-width="1.2"/><polygon points="${tip}" fill="#f3e3c2" stroke="#7b5a2e" stroke-width="1.2"/><text x="${x + 7}" y="${y + 12}" font-family="Barlow Semi Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="11" fill="#5b4220">${t}</text>`;
+    }).join("")}</g>`;
+
+  base.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  base.innerHTML = `${hills}<path class="plan" d="${d}"/><path class="done" id="done" d="${d}"/>${dead}${sign}`;
+  topSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  topSvg.innerHTML = `<g id="pin">
+      <ellipse cx="0" cy="0" rx="9" ry="3.5" fill="rgba(27,42,58,.25)"/>
+      <path d="M-6,-40 C-6,-49 6,-49 6,-40" fill="none" stroke="#174750" stroke-width="2.5"/>
+      <rect x="-12" y="-42" width="24" height="30" rx="7" fill="#1f5c66" stroke="#fff" stroke-width="2"/>
+      <path d="M-9,-17 L9,-35" stroke="#fff" stroke-width="3.5"/>
+    </g>`;
+  pin = document.getElementById("pin");
+  done = document.getElementById("done");
+  total = done.getTotalLength();
+  done.style.strokeDasharray = `${total} ${total}`;
+  deadEls = {};
+  base.querySelectorAll(".dead").forEach((g) => (deadEls[g.dataset.i] = g));
+
+  // Délka trasy u každého milníku
+  lens = [];
+  let from = 0;
+  pts.forEach((p) => {
+    let best = from, bestD = Infinity;
+    for (let l = from; l <= total; l += 2) {
+      const q = done.getPointAtLength(l), dd = Math.hypot(q.x - p.x, q.y - p.y);
+      if (dd < bestD) { bestD = dd; best = l; }
+      if (dd < 1.5) break;
+    }
+    lens.push(best);
+    from = best + 4;
+  });
+
+  const colW = one ? W - 4 : Math.min(230, (W - 20) / cols);
+  stopsEl.innerHTML = "";
+  stopEls = STEPS.map((s, i) => {
+    const li = document.createElement("li");
+    li.className = "stop";
+    li.style.cssText = `left:${one ? 0 : pts[i].x}px; top:${pts[i].y - (one ? 18 : 0)}px; --w:${colW}px; --c:${COLOR[s.track]}`;
+    li.innerHTML = `<button type="button"><span class="dot" aria-hidden="true">${i + 1}</span><span class="lbl">${s.title}</span>${s.badge ? `<span class="badge">${s.badge}</span>` : ""}</button>`;
+    li.querySelector("button").setAttribute("aria-label", `${i + 1}. ${s.title}`);
+    li.querySelector("button").addEventListener("click", () => jump(i));
+    stopsEl.append(li);
+    return li;
+  });
+
+  if (active >= 0) prog = Math.max(prog, lens[active]);
+  if (active < 0 && !playing) prog = 0;
+  render();
+}
+
+function render() {
+  done.style.strokeDashoffset = total - prog;
+  const q = done.getPointAtLength(Math.min(prog, total));
+  const bob = playing && performance.now() < waitUntil ? 0 : Math.sin(prog / 14) * 1.5;
+  pin.setAttribute("transform", `translate(${q.x},${q.y + bob})`);
+  stopEls.forEach((el, i) => {
+    el.classList.toggle("reached", i <= active);
+    el.classList.toggle("active", i === active);
+  });
+  Object.entries(deadEls).forEach(([i, g]) => g.classList.toggle("on", +i <= active));
+}
+
+function showPanel() {
+  const i = Math.max(active, 0), s = STEPS[i];
+  document.getElementById("panel").style.setProperty("--c", COLOR[s.track]);
+  document.getElementById("p-step").textContent = `${i + 1} / ${STEPS.length}`;
+  document.getElementById("p-title").textContent = s.title;
+  document.getElementById("p-text").textContent = s.text;
+  const pl = document.getElementById("p-links");
+  pl.replaceChildren(...(s.links || []).map((l) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = l.label;
+    b.addEventListener("click", () => { pause(); runAction(l.act); });
+    return b;
+  }));
+  document.getElementById("b-prev").disabled = active <= 0;
+  document.getElementById("b-next").disabled = active >= STEPS.length - 1;
+  bPlay.textContent = playing ? "Pozastavit" : active >= STEPS.length - 1 && prog >= lens[STEPS.length - 1] ? "Znovu" : "Přehrát";
+}
+
+function tick(now) {
+  if (!playing) return;
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (now >= waitUntil) {
+    const next = active + 1;
+    const target = next < STEPS.length ? lens[next] : total;
+    prog = Math.min(target, prog + SPEED * dt);
+    if (prog >= target) {
+      if (next < STEPS.length) {
+        active = next;
+        waitUntil = now + PAUSE;
+        showPanel();
+      } else {
+        playing = false;
+        showPanel();
+      }
+    }
+  }
+  render();
+  if (playing) requestAnimationFrame(tick);
+}
+
+function play() {
+  if (reduced) { jump(Math.min(active + 1, STEPS.length - 1)); return; }
+  if (active >= STEPS.length - 1 && prog >= lens[STEPS.length - 1] - 1) { active = -1; prog = 0; }
+  playing = true;
+  last = performance.now();
+  waitUntil = active >= 0 ? last + 600 : 0;
+  showPanel();
+  requestAnimationFrame(tick);
+}
+function pause() { playing = false; showPanel(); }
+function jump(i) {
+  playing = false;
+  active = i;
+  prog = lens[i];
+  render();
+  showPanel();
+}
+
+bPlay.addEventListener("click", () => (playing ? pause() : play()));
+document.getElementById("b-prev").addEventListener("click", () => jump(Math.max(0, active - 1)));
+document.getElementById("b-next").addEventListener("click", () => jump(Math.min(STEPS.length - 1, active + 1)));
+document.getElementById("b-restart").addEventListener("click", () => { active = -1; prog = 0; render(); play(); });
+
+/* ---------- Výsledky: komiks a video ---------- */
+
+function missingBox(file) {
+  const d = document.createElement("div");
+  d.className = "missing";
+  d.innerHTML = `Soubor zatím chybí.<br>Zkopírujte ho do <code>${file}</code>`;
+  return d;
+}
+
+const thumbs = document.getElementById("thumbs");
+RESULTS.comics.forEach((c, i) => {
+  const li = document.createElement("li");
+  li.innerHTML = `<button type="button"><span class="img"><img loading="lazy" alt=""></span><span class="cap"></span><span class="sub"></span></button>`;
+  const img = li.querySelector("img");
+  img.src = c.thumb || c.file;
+  img.alt = c.title;
+  img.addEventListener("error", () => img.replaceWith(missingBox(c.file)));
+  li.querySelector(".cap").textContent = c.title;
+  li.querySelector(".sub").textContent = c.sub;
+  li.querySelector("button").addEventListener("click", () => openViewer(RESULTS.comics, i));
+  thumbs.append(li);
+});
+
+const vstage = document.getElementById("vstage");
+const vseg = document.getElementById("v-seg");
+document.getElementById("v-desc").textContent = RESULTS.video.desc;
+function showVideo(k) {
+  const f = RESULTS.video.formats[k];
+  vseg.querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-pressed", String(j === k)));
+  vstage.classList.toggle("vertical", !!f.vertical);
+  const v = document.createElement("video");
+  v.controls = true;
+  v.preload = "metadata";
+  v.playsInline = true;
+  if (f.poster) v.poster = f.poster;
+  v.src = f.file;
+  v.addEventListener("error", () => vstage.replaceChildren(missingBox(f.file)));
+  vstage.replaceChildren(v);
+  return v;
+}
+RESULTS.video.formats.forEach((f, k) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = f.label;
+  b.addEventListener("click", () => showVideo(k));
+  vseg.append(b);
+});
+vseg.hidden = RESULTS.video.formats.length < 2;
+showVideo(0);
+
+/* Prohlížeč obrázků */
+const viewer = document.getElementById("viewer");
+const vBody = document.getElementById("v-body");
+let vList = [], vIdx = 0;
+function drawViewer() {
+  const c = vList[vIdx];
+  document.getElementById("v-title").textContent = c.sub ? `${c.title} – ${c.sub}` : c.title;
+  document.getElementById("v-raw").href = c.file;
+  document.getElementById("v-prev").disabled = vIdx <= 0;
+  document.getElementById("v-next").disabled = vIdx >= vList.length - 1;
+  document.getElementById("v-prev").hidden = document.getElementById("v-next").hidden = vList.length < 2;
+  vBody.classList.remove("zoom");
+  document.getElementById("v-zoom").textContent = "Skutečná velikost";
+  const img = document.createElement("img");
+  img.id = "v-img";
+  img.alt = c.title;
+  img.src = c.file;
+  img.addEventListener("click", toggleZoom);
+  img.addEventListener("error", () => img.replaceWith(missingBox(c.file)));
+  vBody.replaceChildren(img);
+}
+function toggleZoom() {
+  const z = vBody.classList.toggle("zoom");
+  document.getElementById("v-zoom").textContent = z ? "Přizpůsobit oknu" : "Skutečná velikost";
+}
+function openViewer(list, i) {
+  vList = list; vIdx = i;
+  drawViewer();
+  if (!viewer.open) viewer.showModal();
+}
+document.getElementById("v-prev").addEventListener("click", () => { if (vIdx > 0) { vIdx--; drawViewer(); } });
+document.getElementById("v-next").addEventListener("click", () => { if (vIdx < vList.length - 1) { vIdx++; drawViewer(); } });
+document.getElementById("v-zoom").addEventListener("click", toggleZoom);
+document.getElementById("v-close").addEventListener("click", () => viewer.close());
+viewer.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft") document.getElementById("v-prev").click();
+  if (e.key === "ArrowRight") document.getElementById("v-next").click();
+});
+
+function runAction(act) {
+  if (act.startsWith("comic:")) return openViewer(RESULTS.comics, +act.split(":")[1]);
+  if (act === "video") {
+    document.getElementById("vysledek-video").scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    const v = vstage.querySelector("video");
+    if (v) v.play().catch(() => {});
+  }
+}
+
+layout();
+if (reduced) {
+  jump(0);
+} else {
+  active = 0; prog = lens[0]; render(); showPanel(); playing = false;
+  bPlay.textContent = "Přehrát";
+  // Spustit, až bude mapa vidět
+  const io = new IntersectionObserver((en) => {
+    if (en[0].isIntersecting && !started) { started = true; active = -1; prog = 0; play(); io.disconnect(); }
+  }, { threshold: 0.25 });
+  io.observe(map);
+}
+
+let rt;
+addEventListener("resize", () => {
+  clearTimeout(rt);
+  rt = setTimeout(() => { if (map.clientWidth !== W) layout(); }, 150);
+});
+})();
+</script>
+</body>
+</html>
